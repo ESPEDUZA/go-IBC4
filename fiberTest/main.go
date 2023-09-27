@@ -1,48 +1,36 @@
 package main
 
 import (
-	_ "fmt"
 	"log"
 	"os"
 
+	"github.com/ESPEDUZA/go-IBC4/tree/main/fiberTest/handlers"
+	"github.com/ESPEDUZA/go-IBC4/tree/main/fiberTest/models"
+	"github.com/ESPEDUZA/go-IBC4/tree/main/fiberTest/routes"
 	"github.com/gofiber/fiber/v2"
+	"github.com/joho/godotenv"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
 )
 
 func main() {
-	// Open a log file
-	file, err := os.OpenFile("server.log", os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+	// Load .env file
+	err := godotenv.Load()
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal("Error loading .env file")
 	}
-	defer file.Close()
 
-	// Set log output to the file
-	log.SetOutput(file)
-	log.SetFlags(log.LstdFlags | log.Lshortfile)
+	dsn := "host=" + os.Getenv("DB_HOST") + " user=" + os.Getenv("DB_USER") + " password=" + os.Getenv("DB_PASSWORD") + " dbname=" + os.Getenv("DB_NAME") + " port=" + os.Getenv("DB_PORT") + " sslmode=disable TimeZone=Europe/Paris"
+	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 
-	app := fiber.New(fiber.Config{})
+	if err != nil {
+		log.Fatal("Failed to connect to database")
+	}
 
-	app.Static("/", "./public")
+	models.SetupModels(db)
 
-	app.Get("/api", func(c *fiber.Ctx) error {
-		log.Println("GET /api from", c.IP())
-		return c.SendString("I'm a GET request!")
-	})
+	app := fiber.New()
+	routes.SetupRoutes(app, handlers.NewUserHandler(db))
 
-	app.Route("/test", func(api fiber.Router) {
-		api.Get("/foo", handler1).Name("foo")
-		api.Get("/bar", handler2).Name("ber")
-	}, "test.")
-
-	log.Fatal(app.Listen(":80"))
-}
-
-func handler1(c *fiber.Ctx) error {
-	log.Println("GET /test/foo from", c.IP())
-	return c.SendString("I'm a GET request /test/foo!")
-}
-
-func handler2(c *fiber.Ctx) error {
-	log.Println("GET /test/bar from", c.IP())
-	return c.SendString("I'm a GET request /test/bar!")
+	log.Fatal(app.Listen(":3000"))
 }
